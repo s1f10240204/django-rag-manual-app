@@ -1,0 +1,23 @@
+{% extends 'ragapp/base.html' %}
+{% block title %}マニュアルを読み込み{% endblock %}
+
+{% block content %}
+<div class="load-container">
+    <div class="load-card">
+        <h1>ManuAI</h1>
+        <p class="mb-4">解析したい取扱説明書の製品名を入力してください。</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <input type="text" name="product_name" class="form-control" placeholder="例: Sony WH-1000XM5" required>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn">チャットを開始</button>
+            </div>
+        </form>
+        {% if error %}
+            <div class="text-danger mt-3">{{ error }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

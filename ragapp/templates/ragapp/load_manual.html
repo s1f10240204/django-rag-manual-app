@@ -1,78 +1,228 @@
 {% extends 'ragapp/base.html' %}
 {% block title %}マニュアルを読み込み{% endblock %}
 {% block content %}
-<div class="content-card load-card">
+<div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>ドキュメントを解析中...</p>
+</div>
+
+<div class="content-card load-card" id="main-content">
+
     {% if categories %}
-        <h1>ManuAI</h1>
-        <p class="text-secondary mb-4">製品名を直接入力するか、カテゴリから探してください。</p>
-        <form method="post" id="startForm">
-            {% csrf_token %}
-            <div class="mb-3">
-                <input type="text" name="product_name" class="form-control" id="startInput" placeholder="ここに製品名を入力..." required>
-            </div>
-            <div class="d-grid">
-                <button type="submit" class="btn btn-gradient" id="startBtn">チャットを開始</button>
-            </div>
-        </form>
-        <p id = "text"></p>
-        <div class="text-secondary my-3">— または —</div>
-        <div class="category-grid">
-            {% for category in categories %}
-                <a href="?category={{ category.slug }}" class="category-card">{{ category.name }}</a>
-            {% endfor %}
+
+    <h1>ManuAI</h1>
+    <p class="text-secondary mb-4">製品名を直接入力、カテゴリから選択、またはファイルをアップロードしてください。</p>
+    
+    <form method="post" class="mb-3 needs-validation" id="startForm">
+        {% csrf_token %}
+        <div class="d-grid">
+            <input type="text" name="product_name" class="form-control mb-2" id="startInput" placeholder="ここに製品名を入力..." required>
+            <button type="submit" class="btn btn-gradient" id="startBtn">入力してチャットを開始"</button>
         </div>
+    </form>
+    
+    <div class="separator">または、カテゴリから選択</div>
+    
+    <div class="category-grid">
+        {% for category in categories %}
+        <a href="?category={{ category.slug }}" class="category-card needs-validation">{{ category.name }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="separator">または、ファイルから直接解析</div>
+    
+    <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data" id="upload-form" class="needs-validation">
+        {% csrf_token %}
+        <div class="drop-zone" id="drop-zone">
+            <span class="drop-zone__prompt">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-cloud-arrow-up-fill" viewBox="0 0 16 16"><path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 5.146a.5.5 0 0 1-.708.708L8.5 6.707V10.5a.5.5 0 0 1-1 0V6.707L6.354 7.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0z"/></svg>
+                <br>ここにPDFファイルをドラッグ＆ドロップ<br>
+                <small>またはここをクリックしてファイルを選択</small>
+            </span>
+            <input class="drop-zone__input" type="file" name="pdf_file" id="file-input" accept=".pdf">
+        </div>
+        <div class="d-grid mt-3">
+             <button class="btn btn-gradient" type="submit" id="upload-button" disabled>アップロードして開始</button>
+        </div>
+    </form>
+
     {% elif suggested_products %}
-        <h1>{{ current_category_name }}</h1>
-        <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
-        <form method="post" id="product-form">
-            {% csrf_token %}
-            <div class="mb-3"><input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力..." required></div>
-            <div class="d-grid"><button type="submit" class="btn btn-gradient">チャットを開始</button></div>
-        </form>
-        <div class="mt-4">
-            <p class="text-secondary small">候補から選択:</p>
-            <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
-        </div>
-        <a href="{% url 'load_manual' %}" class="back-link">← カテゴリ選択に戻る</a>
+    <h1>{{ current_category_name }}</h1>
+    <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
+    <form method="post" id="product-form" class="needs-validation">
+        {% csrf_token %}
+        <div class="mb-3"><input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力..." required></div>
+        <div class="d-grid"><button type="submit" class="btn btn-gradient">チャットを開始</button></div>
+    </form>
+    <div class="mt-4">
+        <p class="text-secondary small">候補から選択:</p>
+        <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1 needs-validation" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
+    </div>
+    <a href="{% url 'load_manual' %}" class="back-link">← カテゴリ選択に戻る</a>
+    
     {% endif %}
+
     {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const startForm = document.getElementById('startForm');
-        const startInput = document.getElementById('startInput');
-        const startBtn = document.getElementById('startBtn');
-        const loadingText = document.getElementById('text');
+document.addEventListener('DOMContentLoaded', () => {
+    // ローディングオーバーレイ要素を取得
+    const loadingOverlay = document.getElementById('loading-overlay');
+    
+    // ページ上のすべてのフォームを取得
+    const forms = document.querySelectorAll('form.needs-validation');
+
+    // 各フォームにイベントリスナーを追加
+    forms.forEach(form => {
+        form.addEventListener('submit', (event) => {
+            // イベントを無効化
+            event.preventDefault();
+            
+            // フォームのボタンを無効化して多重送信を防ぐ
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+                // ボタンのテキストやスタイルを更新して、ユーザーにフィードバックを提供する
+                submitButton.textContent = '送信中...';
+            }
+            
+            // ローディング画面を表示
+            loadingOverlay.style.display = 'flex';
+            
+            // フォームを送信
+            form.submit();
+        });
+    });
+
+    // 候補クリックのロジック
+    const suggestionsContainer = document.getElementById('suggestions-container');
+    if (suggestionsContainer) {
+        const productInput = document.getElementById('product-input');
+        const productForm = document.getElementById('product-form');
+        suggestionsContainer.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON') {
+                event.preventDefault(); // デフォルトの動作をキャンセル
+                
+                // ボタンを無効化
+                const allButtons = suggestionsContainer.querySelectorAll('button');
+                allButtons.forEach(btn => btn.disabled = true);
+                
+                // ローディング画面を表示
+                loadingOverlay.style.display = 'flex';
+                
+                productInput.value = event.target.dataset.productName;
+                productForm.submit();
+            }
+        });
+    }
+
+    // ドロップゾーンのロジック
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        const fileInput = document.getElementById('file-input');
+        const uploadButton = document.getElementById('upload-button');
+        const promptSpan = dropZone.querySelector('.drop-zone__prompt');
         
-        function loading_process() {
-            loadingText.textContent = "しばらくお待ちください。";
-            startInput.readOnly = true;
-            startBtn.disabled = true;
-            startForm.submit();
-        }
-        startForm.addEventListener('submit', (event) => {
-            event.preventDefault(); 
-            loading_process();
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                updateDropZone(fileInput.files[0]);
+            }
         });
 
-        const suggestionsContainer = document.getElementById('suggestions-container');
-        if (suggestionsContainer) {
-            const productInput = document.getElementById('product-input');
-            const productForm = document.getElementById('product-form');
-            suggestionsContainer.addEventListener('click', (event) => {
-                if (event.target.tagName === 'BUTTON') {
-                    productInput.value = event.target.dataset.productName;
-                    productForm.submit();
-                }
-            });
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drop-zone--over');
+        });
+        
+        ['dragleave', 'dragend'].forEach(type => {
+            dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over'));
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                updateDropZone(fileInput.files[0]);
+            }
+            dropZone.classList.remove('drop-zone--over');
+        });
+
+        function updateDropZone(file) {
+            let fileInfo = dropZone.querySelector('.drop-zone__file-info');
+            if (fileInfo) fileInfo.remove();
+            
+            if (file) {
+                promptSpan.style.display = 'none';
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'drop-zone__file-info';
+                infoDiv.innerHTML = `<span class="file-name">${file.name}</span><span class="file-remove">&times;</span>`;
+                dropZone.appendChild(infoDiv);
+                uploadButton.disabled = false;
+                
+                infoDiv.querySelector('.file-remove').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fileInput.value = "";
+                    promptSpan.style.display = 'block';
+                    infoDiv.remove();
+                    uploadButton.disabled = true;
+                });
+            }
         }
-    });
+    }
+});
 </script>
 <style>
+/* ... 既存の<style>タグの内容 ... */
+.separator { display: flex; align-items: center; text-align: center; color: var(--text-secondary); margin: 1.5rem 0; }
+.separator::before, .separator::after { content: ''; flex: 1; border-bottom: 1px solid var(--border-color); }
+.separator:not(:empty)::before { margin-right: .5em; }
+.separator:not(:empty)::after { margin-left: .5em; }
 .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
 .category-card { background: #F8F9FA; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
 .category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 .back-link { display: block; margin-top: 1.5rem; color: var(--text-secondary); text-decoration: none; }
 .back-link:hover { color: var(--text-primary); }
+.drop-zone { width: 100%; height: 120px; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 1rem; color: var(--text-secondary); border: 3px dashed var(--border-color); border-radius: 15px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+.drop-zone--over { border-style: solid; border-color: var(--accent-gradient); background-color: rgba(0, 123, 255, 0.05); }
+.drop-zone__input { display: none; }
+.drop-zone__prompt svg { color: #ced4da; margin-bottom: 0.5rem; }
+.drop-zone__file-info { font-size: 1rem; font-weight: bold; color: var(--text-primary); }
+.file-remove { margin-left: 10px; color: #dc3545; font-size: 1.5rem; cursor: pointer; font-weight: bold; }
+.file-remove:hover { color: #a71d2a; }
+
+/* ★★★ ここからが新しいローディング画面のCSS ★★★ */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(5px);
+    display: none; /* 初期状態では非表示 */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+#loading-overlay p {
+    margin-top: 20px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 </style>
 {% endblock %}

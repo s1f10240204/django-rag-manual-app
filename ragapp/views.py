@@ -8,17 +8,17 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import ProcessedManual
-from .rag_handler import create_vectorstore_from_pdf, ask_question
+from .rag_handler import create_vectorstore_from_pdf, ask_question, create_vectorstore_from_vision_pdf
 from googlesearch import search
 
 SUGGESTED_DATA = {
     'aircon': {
         'name': '💨 エアコン', 'slug': 'aircon',
         'products': [
-            {'name': '三菱電機 霧ヶ峰 Zシリーズ', 'icon': '💨'},
-            {'name': 'ダイキン うるさらX', 'icon': '💨'},
-            {'name': '日立 白くまくん Xシリーズ', 'icon': '💨'},
-            {'name': 'パナソニック エオリア LXシリーズ', 'icon': '💨'},
+            {'name': '三菱電機 霧ヶ峰 MSZ-ZW4024S', 'icon': '💨'},
+            {'name': 'ダイキン うるさらX AN40YRP', 'icon': '💨'},
+            {'name': '日立 白くまくん RAS-X40N2', 'icon': '💨'},
+            {'name': 'パナソニック エオリア CS-LX404D2', 'icon': '💨'},
         ]
     },
     'cleaner': {
@@ -129,7 +129,7 @@ def load_manual_view(request):
             vectorstore_id = str(manual.id)
             vectorstore_path = os.path.join(settings.BASE_DIR, 'vectorstores', vectorstore_id)
             
-            success = create_vectorstore_from_pdf(temp_pdf_path, vectorstore_path)
+            success = create_vectorstore_from_vision_pdf(temp_pdf_path, vectorstore_path)
 
             if success:
                 manual.vectorstore_path = vectorstore_path; manual.status = 'COMPLETED'; manual.save()

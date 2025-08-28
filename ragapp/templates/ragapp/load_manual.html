@@ -3,39 +3,54 @@
 
 {% block content %}
 <div class="content-card load-card">
+
     {% if categories %}
-        <h1>ManuAI</h1>
-        <p class="text-secondary mb-4">製品名を直接入力するか、カテゴリから探してください。</p>
-        
-        <form method="post">
-            {% csrf_token %}
-            <div class="mb-3">
-                <input type="text" name="product_name" class="form-control" placeholder="ここに製品名を入力..." required>
-            </div>
-            <div class="d-grid">
-                <button type="submit" class="btn btn-gradient">チャットを開始</button>
-            </div>
-        </form>
-        <div class="text-secondary my-3">— または —</div>
-        <div class="category-grid">
-            {% for category in categories %}
-                <a href="?category={{ category.slug }}" class="category-card">{{ category.name }}</a>
-            {% endfor %}
+    <h1>ManuAI</h1>
+    <p class="text-secondary mb-4">製品名を直接入力、カテゴリから選択、またはファイルをアップロードしてください。</p>
+    
+    <form method="post" class="mb-3">
+        {% csrf_token %}
+        <div class="d-grid">
+            <input type="text" name="product_name" class="form-control mb-2" placeholder="ここに製品名を入力..." required>
+            <button type="submit" class="btn btn-gradient">入力してチャットを開始</button>
         </div>
+    </form>
+    
+    <div class="separator">または、カテゴリから選択</div>
+    
+    <div class="category-grid">
+        {% for category in categories %}
+        <a href="?category={{ category.slug }}" class="category-card">
+            {{ category.name }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="separator">または、ファイルから直接解析</div>
+
+    <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="input-group">
+            <input class="form-control" type="file" name="pdf_file" accept=".pdf" required>
+            <button class="btn btn-gradient" type="submit">アップロードして開始</button>
+        </div>
+    </form>
     {% elif suggested_products %}
-        <h1>{{ current_category_name }}</h1>
-        <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
-        <form method="post" id="product-form">
-            {% csrf_token %}
-            <div class="mb-3"><input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力..." required></div>
-            <div class="d-grid"><button type="submit" class="btn btn-gradient">チャットを開始</button></div>
-        </form>
-        <div class="mt-4">
-            <p class="text-secondary small">候補から選択:</p>
-            <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
-        </div>
-        <a href="{% url 'load_manual' %}" class="back-link">← カテゴリ選択に戻る</a>
+    <h1>{{ current_category_name }}</h1>
+    <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
+    <form method="post" id="product-form">
+        {% csrf_token %}
+        <div class="mb-3"><input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力..." required></div>
+        <div class="d-grid"><button type="submit" class="btn btn-gradient">チャットを開始</button></div>
+    </form>
+    <div class="mt-4">
+        <p class="text-secondary small">候補から選択:</p>
+        <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
+    </div>
+    <a href="{% url 'load_manual' %}" class="back-link">← カテゴリ選択に戻る</a>
+    
     {% endif %}
+
     {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
 
@@ -56,6 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <style>
+.separator { display: flex; align-items: center; text-align: center; color: var(--text-secondary); margin: 1.5rem 0; }
+.separator::before, .separator::after { content: ''; flex: 1; border-bottom: 1px solid var(--border-color); }
+.separator:not(:empty)::before { margin-right: .5em; }
+.separator:not(:empty)::after { margin-left: .5em; }
 .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
 .category-card { background: #f8f9fa; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
 .category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }

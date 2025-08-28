@@ -1,21 +1,20 @@
 {% extends 'ragapp/base.html' %}
 {% block title %}マニュアルを読み込み{% endblock %}
-
 {% block content %}
 <div class="content-card load-card">
     {% if categories %}
         <h1>ManuAI</h1>
         <p class="text-secondary mb-4">製品名を直接入力するか、カテゴリから探してください。</p>
-        
         <form method="post">
             {% csrf_token %}
             <div class="mb-3">
                 <input type="text" name="product_name" class="form-control" placeholder="ここに製品名を入力..." required>
             </div>
             <div class="d-grid">
-                <button type="submit" class="btn btn-gradient">チャットを開始</button>
+                <button type="submit" class="btn btn-gradient" id="testbtn">チャットを開始</button>
             </div>
         </form>
+        <p id = "text"></p>
         <div class="text-secondary my-3">— または —</div>
         <div class="category-grid">
             {% for category in categories %}
@@ -38,8 +37,11 @@
     {% endif %}
     {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
-
 <script>
+    function text_change(){
+        text = document.getElementById("text")
+        text.textContent = "しばらくお待ちください。"
+    }
 document.addEventListener('DOMContentLoaded', () => {
     const suggestionsContainer = document.getElementById('suggestions-container');
     if (suggestionsContainer) {
@@ -52,12 +54,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    btn = document.getElementById("testbtn")
+    btn.addEventListener('click', text_change)
 });
 </script>
-
 <style>
 .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
-.category-card { background: #f8f9fa; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
+.category-card { background: #F8F9FA; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
 .category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 .back-link { display: block; margin-top: 1.5rem; color: var(--text-secondary); text-decoration: none; }
 .back-link:hover { color: var(--text-primary); }

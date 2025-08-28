@@ -2,13 +2,18 @@
 {% block title %}マニュアルを読み込み{% endblock %}
 
 {% block content %}
-<div class="content-card load-card">
+<div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>ドキュメントを解析中...</p>
+</div>
+
+<div class="content-card load-card" id="main-content">
 
     {% if categories %}
     <h1>ManuAI</h1>
     <p class="text-secondary mb-4">製品名を直接入力、カテゴリから選択、またはファイルをアップロードしてください。</p>
     
-    <form method="post" class="mb-3">
+    <form method="post" class="mb-3 needs-validation">
         {% csrf_token %}
         <div class="d-grid">
             <input type="text" name="product_name" class="form-control mb-2" placeholder="ここに製品名を入力..." required>
@@ -20,13 +25,13 @@
     
     <div class="category-grid">
         {% for category in categories %}
-        <a href="?category={{ category.slug }}" class="category-card">{{ category.name }}</a>
+        <a href="?category={{ category.slug }}" class="category-card needs-validation">{{ category.name }}</a>
         {% endfor %}
     </div>
 
     <div class="separator">または、ファイルから直接解析</div>
 
-    <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data" id="upload-form">
+    <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data" id="upload-form" class="needs-validation">
         {% csrf_token %}
         <div class="drop-zone" id="drop-zone">
             <span class="drop-zone__prompt">
@@ -44,14 +49,14 @@
     {% elif suggested_products %}
     <h1>{{ current_category_name }}</h1>
     <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
-    <form method="post" id="product-form">
+    <form method="post" id="product-form" class="needs-validation">
         {% csrf_token %}
         <div class="mb-3"><input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力..." required></div>
         <div class="d-grid"><button type="submit" class="btn btn-gradient">チャットを開始</button></div>
     </form>
     <div class="mt-4">
         <p class="text-secondary small">候補から選択:</p>
-        <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
+        <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1 needs-validation" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
     </div>
     <a href="{% url 'load_manual' %}" class="back-link">← カテゴリ選択に戻る</a>
     
@@ -62,62 +67,70 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 製品候補クリックのロジック (変更なし)
+    // ★★★ ここからがローディング画面のJavaScript ★★★
+    const loadingOverlay = document.getElementById('loading-overlay');
+    
+    // ページ上のすべてのフォームと、カテゴリリンクを取得
+    const forms = document.querySelectorAll('.needs-validation');
+
+    // フォームが送信されたらローディング画面を表示
+    forms.forEach(form => {
+        form.addEventListener('submit', () => {
+            loadingOverlay.style.display = 'flex';
+        });
+    });
+
+    // 候補クリックのロジック
     const suggestionsContainer = document.getElementById('suggestions-container');
     if (suggestionsContainer) {
         const productInput = document.getElementById('product-input');
         const productForm = document.getElementById('product-form');
         suggestionsContainer.addEventListener('click', (event) => {
             if (event.target.tagName === 'BUTTON') {
+                loadingOverlay.style.display = 'flex'; // ローディング表示
                 productInput.value = event.target.dataset.productName;
                 productForm.submit();
             }
         });
     }
 
-    // アップロードエリアのJavaScript (変更なし)
+    // ... 既存のドラッグ＆ドロップのJavaScript ...
     const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const uploadButton = document.getElementById('upload-button');
-    const promptSpan = dropZone.querySelector('.drop-zone__prompt');
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-            updateDropZone(fileInput.files[0]);
-        }
-    });
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drop-zone--over');
-    });
-    ['dragleave', 'dragend'].forEach(type => {
-        dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over'));
-    });
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (e.dataTransfer.files.length > 0) {
-            fileInput.files = e.dataTransfer.files;
-            updateDropZone(fileInput.files[0]);
-        }
-        dropZone.classList.remove('drop-zone--over');
-    });
-    function updateDropZone(file) {
-        let fileInfo = dropZone.querySelector('.drop-zone__file-info');
-        if (fileInfo) fileInfo.remove();
-        if (file) {
-            promptSpan.style.display = 'none';
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'drop-zone__file-info';
-            infoDiv.innerHTML = `<span class="file-name">${file.name}</span><span class="file-remove">&times;</span>`;
-            dropZone.appendChild(infoDiv);
-            uploadButton.disabled = false;
-            infoDiv.querySelector('.file-remove').addEventListener('click', (e) => {
-                e.stopPropagation();
-                fileInput.value = "";
-                promptSpan.style.display = 'block';
-                infoDiv.remove();
-                uploadButton.disabled = true;
-            });
+    if(dropZone) {
+        // (ドラッグ＆ドロップのコードは変更なし)
+        const fileInput = document.getElementById('file-input');
+        const uploadButton = document.getElementById('upload-button');
+        const promptSpan = dropZone.querySelector('.drop-zone__prompt');
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) updateDropZone(fileInput.files[0]); });
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drop-zone--over'); });
+        ['dragleave', 'dragend'].forEach(type => { dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over')); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                updateDropZone(fileInput.files[0]);
+            }
+            dropZone.classList.remove('drop-zone--over');
+        });
+        function updateDropZone(file) {
+            let fileInfo = dropZone.querySelector('.drop-zone__file-info');
+            if (fileInfo) fileInfo.remove();
+            if (file) {
+                promptSpan.style.display = 'none';
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'drop-zone__file-info';
+                infoDiv.innerHTML = `<span class="file-name">${file.name}</span><span class="file-remove">&times;</span>`;
+                dropZone.appendChild(infoDiv);
+                uploadButton.disabled = false;
+                infoDiv.querySelector('.file-remove').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fileInput.value = "";
+                    promptSpan.style.display = 'block';
+                    infoDiv.remove();
+                    uploadButton.disabled = true;
+                });
+            }
         }
     }
 });
@@ -134,49 +147,46 @@ document.addEventListener('DOMContentLoaded', () => {
 .category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 .back-link { display: block; margin-top: 1.5rem; color: var(--text-secondary); text-decoration: none; }
 .back-link:hover { color: var(--text-primary); }
+.drop-zone { width: 100%; height: 120px; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 1rem; color: var(--text-secondary); border: 3px dashed var(--border-color); border-radius: 15px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+.drop-zone--over { border-style: solid; border-color: var(--accent-gradient); background-color: rgba(0, 123, 255, 0.05); }
+.drop-zone__input { display: none; }
+.drop-zone__prompt svg { color: #ced4da; margin-bottom: 0.5rem; }
+.drop-zone__file-info { font-size: 1rem; font-weight: bold; color: var(--text-primary); }
+.file-remove { margin-left: 10px; color: #dc3545; font-size: 1.5rem; cursor: pointer; font-weight: bold; }
+.file-remove:hover { color: #a71d2a; }
 
-/* ★★★ アップロードエリアのCSSを調整 ★★★ */
-.drop-zone {
+/* ★★★ ここからが新しいローディング画面のCSS ★★★ */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 120px; /* 高さを 200px から 120px に変更 */
-    padding: 20px; /* パディングを 25px から 20px に変更 */
-    display: flex;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(5px);
+    display: none; /* 初期状態では非表示 */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    text-align: center;
-    font-size: 1rem; /* フォントサイズを 1.1rem から 1rem に変更 */
-    color: var(--text-secondary);
-    border: 3px dashed var(--border-color);
-    border-radius: 15px;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
+    z-index: 9999;
 }
-.drop-zone--over {
-    border-style: solid;
-    border-color: var(--accent-gradient);
-    background-color: rgba(0, 123, 255, 0.05);
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
-.drop-zone__input {
-    display: none;
-}
-.drop-zone__prompt svg {
-    color: #ced4da;
-    margin-bottom: 0.5rem; /* マージンを調整 */
-}
-.drop-zone__file-info {
-    font-size: 1rem;
+#loading-overlay p {
+    margin-top: 20px;
+    font-size: 1.2rem;
     font-weight: bold;
     color: var(--text-primary);
 }
-.file-remove {
-    margin-left: 10px;
-    color: #dc3545;
-    font-size: 1.5rem;
-    cursor: pointer;
-    font-weight: bold;
-}
-.file-remove:hover {
-    color: #a71d2a;
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
 {% endblock %}

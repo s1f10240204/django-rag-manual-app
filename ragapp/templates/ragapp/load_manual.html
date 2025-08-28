@@ -5,13 +5,13 @@
     {% if categories %}
         <h1>ManuAI</h1>
         <p class="text-secondary mb-4">製品名を直接入力するか、カテゴリから探してください。</p>
-        <form method="post">
+        <form method="post" id="startForm">
             {% csrf_token %}
             <div class="mb-3">
-                <input type="text" name="product_name" class="form-control" placeholder="ここに製品名を入力..." required>
+                <input type="text" name="product_name" class="form-control" id="startInput" placeholder="ここに製品名を入力..." required>
             </div>
             <div class="d-grid">
-                <button type="submit" class="btn btn-gradient" id="testbtn">チャットを開始</button>
+                <button type="submit" class="btn btn-gradient" id="startBtn">チャットを開始</button>
             </div>
         </form>
         <p id = "text"></p>
@@ -38,25 +38,35 @@
     {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
 <script>
-    function text_change(){
-        text = document.getElementById("text")
-        text.textContent = "しばらくお待ちください。"
-    }
-document.addEventListener('DOMContentLoaded', () => {
-    const suggestionsContainer = document.getElementById('suggestions-container');
-    if (suggestionsContainer) {
-        const productInput = document.getElementById('product-input');
-        const productForm = document.getElementById('product-form');
-        suggestionsContainer.addEventListener('click', (event) => {
-            if (event.target.tagName === 'BUTTON') {
-                productInput.value = event.target.dataset.productName;
-                productForm.submit();
-            }
+    document.addEventListener('DOMContentLoaded', () => {
+        const startForm = document.getElementById('startForm');
+        const startInput = document.getElementById('startInput');
+        const startBtn = document.getElementById('startBtn');
+        const loadingText = document.getElementById('text');
+        
+        function loading_process() {
+            loadingText.textContent = "しばらくお待ちください。";
+            startInput.readOnly = true;
+            startBtn.disabled = true;
+            startForm.submit();
+        }
+        startForm.addEventListener('submit', (event) => {
+            event.preventDefault(); 
+            loading_process();
         });
-    }
-    btn = document.getElementById("testbtn")
-    btn.addEventListener('click', text_change)
-});
+
+        const suggestionsContainer = document.getElementById('suggestions-container');
+        if (suggestionsContainer) {
+            const productInput = document.getElementById('product-input');
+            const productForm = document.getElementById('product-form');
+            suggestionsContainer.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON') {
+                    productInput.value = event.target.dataset.productName;
+                    productForm.submit();
+                }
+            });
+        }
+    });
 </script>
 <style>
 .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }

@@ -2,81 +2,52 @@
 {% block title %}マニュアルを読み込み{% endblock %}
 
 {% block content %}
-<div class="load-container">
-    <div class="load-card">
-
-        {% if categories %}
+<div class="content-card load-card">
+    {% if categories %}
         <h1>ManuAI</h1>
-        <p class="mb-4">製品名を直接入力するか、下のカテゴリから探してください。</p>
+        <p class="text-secondary mb-4">製品名を直接入力するか、カテゴリから探してください。</p>
         
-        <form method="post" id="product-form">
+        <form method="post">
             {% csrf_token %}
             <div class="mb-3">
-                <input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力して解析開始..." required>
+                <input type="text" name="product_name" class="form-control" placeholder="ここに製品名を入力..." required>
             </div>
             <div class="d-grid">
-                <button type="submit" class="btn">チャットを開始</button>
+                <button type="submit" class="btn btn-gradient">チャットを開始</button>
             </div>
         </form>
-
-        <div class="separator">または</div>
-
+        <div class="text-secondary my-3">— または —</div>
         <div class="category-grid">
             {% for category in categories %}
-            <a href="?category={{ category.slug }}" class="category-card">
-                {{ category.name }}
-            </a>
+                <a href="?category={{ category.slug }}" class="category-card">{{ category.name }}</a>
             {% endfor %}
         </div>
-
-
-        {% elif suggested_products %}
+    {% elif suggested_products %}
         <h1>{{ current_category_name }}</h1>
-        <p class="mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
-        
-        <form method="post" id="product-form-detail">
+        <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
+        <form method="post" id="product-form">
             {% csrf_token %}
-            <div class="mb-3">
-                <input type="text" name="product_name" id="product-input-detail" class="form-control" placeholder="ここに製品名を入力..." required>
-            </div>
-            <div class="d-grid">
-                <button type="submit" class="btn">チャットを開始</button>
-            </div>
+            <div class="mb-3"><input type="text" name="product_name" id="product-input" class="form-control" placeholder="ここに製品名を入力..." required></div>
+            <div class="d-grid"><button type="submit" class="btn btn-gradient">チャットを開始</button></div>
         </form>
-         
         <div class="mt-4">
-            <p class="text-muted small">または、人気の製品から選択:</p>
-            <div id="suggestions-container" class="d-flex flex-wrap justify-content-center gap-2">
-                {% for product in suggested_products %}
-                <button class="btn btn-sm" data-product-name="{{ product.name }}">
-                    {{ product.icon }} {{ product.name }}
-                </button>
-                {% endfor %}
-            </div>
+            <p class="text-secondary small">候補から選択:</p>
+            <div id="suggestions-container">{% for p in suggested_products %}<button class="btn btn-light m-1" data-product-name="{{ p.name }}">{{ p.icon }} {{ p.name }}</button>{% endfor %}</div>
         </div>
-        
         <a href="{% url 'load_manual' %}" class="back-link">← カテゴリ選択に戻る</a>
-        
-        {% endif %}
-
-        {% if error %}
-            <div class="text-danger mt-3">{{ error }}</div>
-        {% endif %}
-    </div>
+    {% endif %}
+    {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 製品選択画面の「候補クリック」ロジック
     const suggestionsContainer = document.getElementById('suggestions-container');
     if (suggestionsContainer) {
-        const productInput = document.getElementById('product-input-detail');
-        const productForm = document.getElementById('product-form-detail');
-
+        const productInput = document.getElementById('product-input');
+        const productForm = document.getElementById('product-form');
         suggestionsContainer.addEventListener('click', (event) => {
             if (event.target.tagName === 'BUTTON') {
-                const productName = event.target.dataset.productName;
-                productInput.value = productName;
+                productInput.value = event.target.dataset.productName;
                 productForm.submit();
             }
         });
@@ -85,41 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <style>
-    /* このページ専用のスタイル */
-    .separator {
-        display: flex; align-items: center; text-align: center;
-        color: var(--header-secondary); margin: 1.5rem 0;
-    }
-    .separator::before, .separator::after {
-        content: ''; flex: 1; border-bottom: 1px solid var(--background-primary);
-    }
-    .separator:not(:empty)::before { margin-right: .5em; }
-    .separator:not(:empty)::after { margin-left: .5em; }
-
-    .category-grid {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;
-    }
-    .category-card {
-        background-color: var(--background-tertiary); border: 1px solid var(--background-primary);
-        color: var(--text-normal); padding: 1.5rem 1rem; border-radius: 8px;
-        text-align: center; text-decoration: none; transition: all 0.2s ease;
-    }
-    .category-card:hover {
-        border-color: var(--brand-accent); background-color: var(--brand-accent);
-        color: white; transform: translateY(-4px); box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-
-    #suggestions-container .btn {
-        background-color: var(--background-tertiary); border: 1px solid var(--background-primary);
-        color: var(--text-normal); transition: all 0.2s ease;
-    }
-    #suggestions-container .btn:hover {
-        border-color: var(--brand-accent); background-color: var(--brand-accent);
-        color: white; transform: translateY(-2px);
-    }
-    .back-link {
-        display: block; margin-top: 1.5rem; color: var(--header-secondary); text-decoration: none;
-    }
-    .back-link:hover { color: var(--header-primary); }
+.category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+.category-card { background: #f8f9fa; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
+.category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+.back-link { display: block; margin-top: 1.5rem; color: var(--text-secondary); text-decoration: none; }
+.back-link:hover { color: var(--text-primary); }
 </style>
 {% endblock %}

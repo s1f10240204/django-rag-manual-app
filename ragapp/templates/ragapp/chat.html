@@ -2,20 +2,19 @@
 {% block title %}チャット - {{ product_name }}{% endblock %}
 
 {% block content %}
-<div class="chat-container">
+<div class="content-card chat-window">
     <header class="chat-header">
-        <h2># {{ product_name }}</h2>
+        <span>{{ product_name }}</span>
+        <a href="{% url 'load_manual' %}" class="float-end">別の製品へ</a>
     </header>
-
-    <main class="chat-body" id="chat-body">
-        </main>
-
+    <main class="chat-body" id="chat-body"></main>
     <footer class="chat-footer">
-        <div class="chat-input-wrapper">
-            <form id="chat-form">
-                <input type="text" id="chat-input" class="chat-input" placeholder="{{ product_name }}について質問..." autocomplete="off">
-            </form>
-        </div>
+        <form id="chat-form">
+            <div class="input-group">
+                <input type="text" id="chat-input" class="form-control" placeholder="メッセージを入力..." autocomplete="off">
+                <button class="btn btn-gradient" type="submit">送信</button>
+            </div>
+        </form>
     </footer>
 </div>
 
@@ -24,105 +23,57 @@ const chatBody = document.getElementById('chat-body');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 
-// メッセージをチャット欄に追加する関数
 function addMessage(author, content) {
     const isAI = author === 'AI';
+    const messageWrapper = document.createElement('div');
+    messageWrapper.style.display = 'flex';
+    if(author === 'You') messageWrapper.style.justifyContent = 'flex-end';
+
     const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message');
-
-    // Avatar
-    const avatarDiv = document.createElement('div');
-    avatarDiv.classList.add('avatar');
-    if (isAI) avatarDiv.classList.add('ai');
-    avatarDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="${isAI ? 'M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16M5.5 5.5A.5.5 0 0 1 6 6v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5' : 'M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z'}"/></svg>`;
-
-    // Content
-    const contentDiv = document.createElement('div');
-    contentDiv.classList.add('message-content');
-    contentDiv.innerHTML = `
-        <div class="message-header">
-            <span class="message-author">${author}</span>
-        </div>
-        <div class="message-body">${content}</div>
-    `;
-
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(contentDiv);
-    chatBody.appendChild(messageDiv);
-
-    // Scroll to bottom
+    messageDiv.classList.add('chat-bubble', isAI ? 'ai-message' : 'user-message');
+    messageDiv.innerHTML = content;
+    
+    messageWrapper.appendChild(messageDiv);
+    chatBody.appendChild(messageWrapper);
     chatBody.scrollTop = chatBody.scrollHeight;
 }
 
-// AIのタイピング中インジケーターを表示/非表示する関数
 function toggleTypingIndicator(show) {
     let indicator = document.getElementById('typing-indicator');
     if (show) {
         if (!indicator) {
             indicator = document.createElement('div');
             indicator.id = 'typing-indicator';
-            indicator.classList.add('message');
-            indicator.innerHTML = `
-                <div class="avatar ai">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16M5.5 5.5A.5.5 0 0 1 6 6v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5"/></svg>
-                </div>
-                <div class="message-content">
-                    <div class="message-header"><span class="message-author">AI</span></div>
-                    <div class="message-body typing-indicator">
-                        <span></span><span></span><span></span>
-                    </div>
-                </div>
-            `;
+            indicator.style.display = 'flex';
+            indicator.innerHTML = `<div class="chat-bubble ai-message"><span>.</span><span>.</span><span>.</span></div>`;
             chatBody.appendChild(indicator);
             chatBody.scrollTop = chatBody.scrollHeight;
         }
     } else {
-        if (indicator) {
-            indicator.remove();
-        }
+        if (indicator) indicator.remove();
     }
 }
 
-
-// フォーム送信時のイベント
 chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const question = chatInput.value.trim();
     if (!question) return;
-
-    // 1. ユーザーのメッセージを画面に追加
     addMessage('You', question);
     chatInput.value = '';
-
-    // 2. AIのタイピング中インジケーターを表示
     toggleTypingIndicator(true);
-
-    // 3. サーバーに質問を送信
     const formData = new FormData();
     formData.append('question', question);
-
     try {
-        const response = await fetch("{% url 'chat_api' %}", {
-            method: 'POST',
-            body: formData,
-        });
+        const response = await fetch("{% url 'chat_api' %}", { method: 'POST', body: formData });
         const data = await response.json();
-
-        // 4. タイピング中インジケーターを非表示
         toggleTypingIndicator(false);
-        
-        // 5. AIの回答を画面に追加
         addMessage('AI', data.answer.replace(/\n/g, '<br>'));
-
     } catch (error) {
         toggleTypingIndicator(false);
-        addMessage('AI', 'エラーが発生しました。もう一度試してください。');
-        console.error('Error:', error);
+        addMessage('AI', 'エラーが発生しました。');
     }
 });
 
-// 初期メッセージ
-addMessage('AI', 'こんにちは！「{{ product_name }}」の取扱説明書について、何でも聞いてください。');
-
+addMessage('AI', `こんにちは！「${"{{ product_name }}"}」の取扱説明書について、何でも聞いてください。`);
 </script>
 {% endblock %}

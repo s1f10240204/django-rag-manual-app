@@ -1,6 +1,5 @@
 {% extends 'ragapp/base.html' %}
 {% block title %}マニュアルを読み込み{% endblock %}
-
 {% block content %}
 <div id="loading-overlay">
     <div class="loading-spinner"></div>
@@ -10,14 +9,15 @@
 <div class="content-card load-card" id="main-content">
 
     {% if categories %}
+
     <h1>ManuAI</h1>
     <p class="text-secondary mb-4">製品名を直接入力、カテゴリから選択、またはファイルをアップロードしてください。</p>
     
-    <form method="post" class="mb-3 needs-validation">
+    <form method="post" class="mb-3 needs-validation" id="startForm">
         {% csrf_token %}
         <div class="d-grid">
-            <input type="text" name="product_name" class="form-control mb-2" placeholder="ここに製品名を入力..." required>
-            <button type="submit" class="btn btn-gradient">入力してチャットを開始</button>
+            <input type="text" name="product_name" class="form-control mb-2" id="startInput" placeholder="ここに製品名を入力..." required>
+            <button type="submit" class="btn btn-gradient" id="startBtn">入力してチャットを開始"</button>
         </div>
     </form>
     
@@ -30,7 +30,7 @@
     </div>
 
     <div class="separator">または、ファイルから直接解析</div>
-
+    
     <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data" id="upload-form" class="needs-validation">
         {% csrf_token %}
         <div class="drop-zone" id="drop-zone">
@@ -64,19 +64,33 @@
 
     {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // ★★★ ここからがローディング画面のJavaScript ★★★
+    // ローディングオーバーレイ要素を取得
     const loadingOverlay = document.getElementById('loading-overlay');
     
-    // ページ上のすべてのフォームと、カテゴリリンクを取得
-    const forms = document.querySelectorAll('.needs-validation');
+    // ページ上のすべてのフォームを取得
+    const forms = document.querySelectorAll('form.needs-validation');
 
-    // フォームが送信されたらローディング画面を表示
+    // 各フォームにイベントリスナーを追加
     forms.forEach(form => {
-        form.addEventListener('submit', () => {
+        form.addEventListener('submit', (event) => {
+            // イベントを無効化
+            event.preventDefault();
+            
+            // フォームのボタンを無効化して多重送信を防ぐ
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+                // ボタンのテキストやスタイルを更新して、ユーザーにフィードバックを提供する
+                submitButton.textContent = '送信中...';
+            }
+            
+            // ローディング画面を表示
             loadingOverlay.style.display = 'flex';
+            
+            // フォームを送信
+            form.submit();
         });
     });
 
@@ -87,24 +101,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const productForm = document.getElementById('product-form');
         suggestionsContainer.addEventListener('click', (event) => {
             if (event.target.tagName === 'BUTTON') {
-                loadingOverlay.style.display = 'flex'; // ローディング表示
+                event.preventDefault(); // デフォルトの動作をキャンセル
+                
+                // ボタンを無効化
+                const allButtons = suggestionsContainer.querySelectorAll('button');
+                allButtons.forEach(btn => btn.disabled = true);
+                
+                // ローディング画面を表示
+                loadingOverlay.style.display = 'flex';
+                
                 productInput.value = event.target.dataset.productName;
                 productForm.submit();
             }
         });
     }
 
-    // ... 既存のドラッグ＆ドロップのJavaScript ...
+    // ドロップゾーンのロジック
     const dropZone = document.getElementById('drop-zone');
-    if(dropZone) {
-        // (ドラッグ＆ドロップのコードは変更なし)
+    if (dropZone) {
         const fileInput = document.getElementById('file-input');
         const uploadButton = document.getElementById('upload-button');
         const promptSpan = dropZone.querySelector('.drop-zone__prompt');
+        
         dropZone.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', () => { if (fileInput.files.length > 0) updateDropZone(fileInput.files[0]); });
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drop-zone--over'); });
-        ['dragleave', 'dragend'].forEach(type => { dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over')); });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                updateDropZone(fileInput.files[0]);
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drop-zone--over');
+        });
+        
+        ['dragleave', 'dragend'].forEach(type => {
+            dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over'));
+        });
+        
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             if (e.dataTransfer.files.length > 0) {
@@ -113,9 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             dropZone.classList.remove('drop-zone--over');
         });
+
         function updateDropZone(file) {
             let fileInfo = dropZone.querySelector('.drop-zone__file-info');
             if (fileInfo) fileInfo.remove();
+            
             if (file) {
                 promptSpan.style.display = 'none';
                 const infoDiv = document.createElement('div');
@@ -123,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 infoDiv.innerHTML = `<span class="file-name">${file.name}</span><span class="file-remove">&times;</span>`;
                 dropZone.appendChild(infoDiv);
                 uploadButton.disabled = false;
+                
                 infoDiv.querySelector('.file-remove').addEventListener('click', (e) => {
                     e.stopPropagation();
                     fileInput.value = "";
@@ -135,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
-
 <style>
 /* ... 既存の<style>タグの内容 ... */
 .separator { display: flex; align-items: center; text-align: center; color: var(--text-secondary); margin: 1.5rem 0; }
@@ -143,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
 .separator:not(:empty)::before { margin-right: .5em; }
 .separator:not(:empty)::after { margin-left: .5em; }
 .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
-.category-card { background: #f8f9fa; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
+.category-card { background: #F8F9FA; border: 1px solid var(--border-color); color: var(--text-primary); padding: 1.5rem 1rem; border-radius: 12px; text-decoration: none; transition: all 0.2s ease; font-size: 0.9rem; }
 .category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 .back-link { display: block; margin-top: 1.5rem; color: var(--text-secondary); text-decoration: none; }
 .back-link:hover { color: var(--text-primary); }

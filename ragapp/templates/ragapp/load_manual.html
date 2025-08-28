@@ -20,21 +20,27 @@
     
     <div class="category-grid">
         {% for category in categories %}
-        <a href="?category={{ category.slug }}" class="category-card">
-            {{ category.name }}
-        </a>
+        <a href="?category={{ category.slug }}" class="category-card">{{ category.name }}</a>
         {% endfor %}
     </div>
 
     <div class="separator">または、ファイルから直接解析</div>
 
-    <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data">
+    <form action="{% url 'upload_manual' %}" method="post" enctype="multipart/form-data" id="upload-form">
         {% csrf_token %}
-        <div class="input-group">
-            <input class="form-control" type="file" name="pdf_file" accept=".pdf" required>
-            <button class="btn btn-gradient" type="submit">アップロードして開始</button>
+        <div class="drop-zone" id="drop-zone">
+            <span class="drop-zone__prompt">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-cloud-arrow-up-fill" viewBox="0 0 16 16"><path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 5.146a.5.5 0 0 1-.708.708L8.5 6.707V10.5a.5.5 0 0 1-1 0V6.707L6.354 7.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0z"/></svg>
+                <br>ここにPDFファイルをドラッグ＆ドロップ<br>
+                <small>またはここをクリックしてファイルを選択</small>
+            </span>
+            <input class="drop-zone__input" type="file" name="pdf_file" id="file-input" accept=".pdf">
+        </div>
+        <div class="d-grid mt-3">
+             <button class="btn btn-gradient" type="submit" id="upload-button" disabled>アップロードして開始</button>
         </div>
     </form>
+
     {% elif suggested_products %}
     <h1>{{ current_category_name }}</h1>
     <p class="text-secondary mb-4">人気の製品を選択するか、型番を直接入力してください。</p>
@@ -56,6 +62,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // 製品候補クリックのロジック (変更なし)
     const suggestionsContainer = document.getElementById('suggestions-container');
     if (suggestionsContainer) {
         const productInput = document.getElementById('product-input');
@@ -67,10 +74,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // アップロードエリアのJavaScript (変更なし)
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadButton = document.getElementById('upload-button');
+    const promptSpan = dropZone.querySelector('.drop-zone__prompt');
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            updateDropZone(fileInput.files[0]);
+        }
+    });
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drop-zone--over');
+    });
+    ['dragleave', 'dragend'].forEach(type => {
+        dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over'));
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            updateDropZone(fileInput.files[0]);
+        }
+        dropZone.classList.remove('drop-zone--over');
+    });
+    function updateDropZone(file) {
+        let fileInfo = dropZone.querySelector('.drop-zone__file-info');
+        if (fileInfo) fileInfo.remove();
+        if (file) {
+            promptSpan.style.display = 'none';
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'drop-zone__file-info';
+            infoDiv.innerHTML = `<span class="file-name">${file.name}</span><span class="file-remove">&times;</span>`;
+            dropZone.appendChild(infoDiv);
+            uploadButton.disabled = false;
+            infoDiv.querySelector('.file-remove').addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileInput.value = "";
+                promptSpan.style.display = 'block';
+                infoDiv.remove();
+                uploadButton.disabled = true;
+            });
+        }
+    }
 });
 </script>
 
 <style>
+/* ... 既存の<style>タグの内容 ... */
 .separator { display: flex; align-items: center; text-align: center; color: var(--text-secondary); margin: 1.5rem 0; }
 .separator::before, .separator::after { content: ''; flex: 1; border-bottom: 1px solid var(--border-color); }
 .separator:not(:empty)::before { margin-right: .5em; }
@@ -80,5 +134,49 @@ document.addEventListener('DOMContentLoaded', () => {
 .category-card:hover { border-color: #ddd; background: #fff; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 .back-link { display: block; margin-top: 1.5rem; color: var(--text-secondary); text-decoration: none; }
 .back-link:hover { color: var(--text-primary); }
+
+/* ★★★ アップロードエリアのCSSを調整 ★★★ */
+.drop-zone {
+    width: 100%;
+    height: 120px; /* 高さを 200px から 120px に変更 */
+    padding: 20px; /* パディングを 25px から 20px に変更 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 1rem; /* フォントサイズを 1.1rem から 1rem に変更 */
+    color: var(--text-secondary);
+    border: 3px dashed var(--border-color);
+    border-radius: 15px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.drop-zone--over {
+    border-style: solid;
+    border-color: var(--accent-gradient);
+    background-color: rgba(0, 123, 255, 0.05);
+}
+.drop-zone__input {
+    display: none;
+}
+.drop-zone__prompt svg {
+    color: #ced4da;
+    margin-bottom: 0.5rem; /* マージンを調整 */
+}
+.drop-zone__file-info {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+.file-remove {
+    margin-left: 10px;
+    color: #dc3545;
+    font-size: 1.5rem;
+    cursor: pointer;
+    font-weight: bold;
+}
+.file-remove:hover {
+    color: #a71d2a;
+}
 </style>
 {% endblock %}

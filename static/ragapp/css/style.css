@@ -71,7 +71,7 @@ body {
 /* --- Chat Window --- */
 .chat-window {
     width: 100%;
-    max-width: 800px;
+    max-width: 900px;
     height: 85vh;
     display: flex;
     flex-direction: column;

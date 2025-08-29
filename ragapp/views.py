@@ -69,71 +69,106 @@ SUGGESTED_DATA = {
 }
 
 def load_manual_view(request):
+    """マニュアル読み込みページ"""
     if request.method == 'GET':
         category_slug = request.GET.get('category')
         if category_slug and category_slug in SUGGESTED_DATA:
             category_info = SUGGESTED_DATA[category_slug]
-            context = {'suggested_products': category_info['products'], 'current_category_name': category_info['name']}
-            return render(request, 'ragapp/load_manual.html', context)
+            context = {
+                'suggested_products': category_info['products'],
+                'current_category_name': category_info['name']
+            }
         else:
             context = {'categories': SUGGESTED_DATA.values()}
-            return render(request, 'ragapp/load_manual.html', context)
 
-    if request.method == 'POST':
+        # セッションに失敗フラグがある場合に渡す
+        recognition_failed = request.session.pop('recognition_failed', False)
+        context['recognition_failed'] = bool(request.session.pop('recognition_failed', False))
+        return render(request, 'ragapp/load_manual.html', context)
+
+    elif request.method == 'POST':
         product_name_raw = request.POST.get('product_name', '').strip()
         current_category_slug = request.GET.get('category')
-        def render_error(error_message):
+
+        def render_error(error_message, recognition_failed=False):
+            context = {'error': error_message, 'recognition_failed': recognition_failed}
             if current_category_slug and current_category_slug in SUGGESTED_DATA:
                 category_info = SUGGESTED_DATA[current_category_slug]
-                context = {'error': error_message, 'suggested_products': category_info['products'], 'current_category_name': category_info['name']}
-                return render(request, 'ragapp/load_manual.html', context)
+                context.update({
+                    'suggested_products': category_info['products'],
+                    'current_category_name': category_info['name']
+                })
             else:
-                context = {'error': error_message, 'categories': SUGGESTED_DATA.values()}
-                return render(request, 'ragapp/load_manual.html', context)
+                context.update({'categories': SUGGESTED_DATA.values()})
+            return render(request, 'ragapp/load_manual.html', context)
 
-        if not product_name_raw: return render_error('製品名を入力してください。')
+        if not product_name_raw:
+            return render_error('製品名を入力してください。')
 
         product_name = product_name_raw.lower()
         manual, created = ProcessedManual.objects.get_or_create(product_name=product_name)
 
         if not created and manual.status == 'COMPLETED':
-            request.session['vectorstore_path'] = manual.vectorstore_path; request.session['product_name'] = product_name_raw
+            request.session['vectorstore_path'] = manual.vectorstore_path
+            request.session['product_name'] = product_name_raw
             return redirect('chat')
-        
-        if manual.status == 'FAILED': manual.status = 'COMPLETED'; manual.save()
 
+        if manual.status == 'FAILED':
+            manual.status = 'COMPLETED'
+            manual.save()
+
+        # Google検索でPDF取得
         query = f'"{product_name_raw}" 取扱説明書 filetype:pdf'
         pdf_url = None
         try:
             for url in search(query, num_results=5, lang="ja", sleep_interval=1):
-                if url.endswith('.pdf'): pdf_url = url; break
-        except Exception as e: return render_error(f'Google検索中にエラーが発生: {e}')
-        
-        if not pdf_url: return render_error('取扱説明書のPDFが見つかりませんでした。')
+                if url.endswith('.pdf'):
+                    pdf_url = url
+                    break
+        except Exception as e:
+            return render_error(f'Google検索中にエラー: {e}')
+
+        if not pdf_url:
+            request.session['recognition_failed'] = True
+            return render_error('PDFが見つかりませんでした', recognition_failed=True)
 
         temp_pdf_path = ""
         try:
-            response = requests.get(pdf_url, timeout=30, verify=False); response.raise_for_status()
-            temp_dir = os.path.join(settings.BASE_DIR, 'temp_manuals'); os.makedirs(temp_dir, exist_ok=True)
+            response = requests.get(pdf_url, timeout=30, verify=False)
+            response.raise_for_status()
+            temp_dir = os.path.join(settings.BASE_DIR, 'temp_manuals')
+            os.makedirs(temp_dir, exist_ok=True)
             temp_pdf_path = os.path.join(temp_dir, f"{uuid.uuid4()}.pdf")
-            with open(temp_pdf_path, 'wb') as f: f.write(response.content)
-            
+            with open(temp_pdf_path, 'wb') as f:
+                f.write(response.content)
+
+            # 解析
             vectorstore_id = str(manual.id)
             vectorstore_path = os.path.join(settings.BASE_DIR, 'vectorstores', vectorstore_id)
-            success = create_vectorstore_from_vision_pdf(temp_pdf_path, vectorstore_path)
+            success, pages_analyzed = create_vectorstore_from_vision_pdf(temp_pdf_path, vectorstore_path)
 
-            if success:
-                manual.vectorstore_path = vectorstore_path; manual.status = 'COMPLETED'; manual.save()
-                request.session['vectorstore_path'] = vectorstore_path; request.session['product_name'] = product_name_raw
-                return redirect('chat')
-            else:
-                manual.status = 'FAILED'; manual.save()
-                return render_error('PDFの解析に失敗しました。(Popplerはインストールされていますか？)')
+            if not success or pages_analyzed == 0:
+                manual.status = 'FAILED'
+                manual.save()
+                request.session['recognition_failed'] = True
+                return render_error('型番を認識できませんでした。', recognition_failed=True)
+
+            # 成功
+            manual.vectorstore_path = vectorstore_path
+            manual.status = 'COMPLETED'
+            manual.save()
+            request.session['vectorstore_path'] = vectorstore_path
+            request.session['product_name'] = product_name_raw
+            return redirect('chat')
+
         except requests.exceptions.RequestException as e:
-            manual.status = 'FAILED'; manual.save()
-            return render_error(f'PDFのダウンロードに失敗: {e}')
+            manual.status = 'FAILED'
+            manual.save()
+            request.session['recognition_failed'] = True
+            return render_error(f'PDFのダウンロードに失敗: {e}', recognition_failed=True)
         finally:
-            if os.path.exists(temp_pdf_path): os.remove(temp_pdf_path)
+            if temp_pdf_path and os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
 
     return render(request, 'ragapp/load_manual.html', {'categories': SUGGESTED_DATA.values()})
 
@@ -170,7 +205,13 @@ def upload_manual_view(request):
             vectorstore_path = os.path.join(settings.BASE_DIR, 'vectorstores', vectorstore_id)
             
             # PDFを解析してベクトルストアを作成
-            success = create_vectorstore_from_vision_pdf(temp_pdf_path, vectorstore_path)
+            
+            success, pages_analyzed = create_vectorstore_from_vision_pdf(temp_pdf_path, vectorstore_path)
+            if not success or pages_analyzed == 0:
+                manual.status = 'FAILED'
+                manual.save()
+                request.session['recognition_failed'] = True
+                return render_error('型番を認識できませんでした。', recognition_failed=True)
 
             if success:
                 # 成功したらセッションに情報を保存してチャットページへ
@@ -197,8 +238,10 @@ def chat_view(request):
 @require_POST
 def chat_api_view(request):
     vectorstore_path = request.session.get('vectorstore_path')
-    if not vectorstore_path: return JsonResponse({'error': 'Session expired'}, status=400)
+    if not vectorstore_path:
+        return JsonResponse({'error': 'Session expired'}, status=400)
     question = request.POST.get('question', '')
-    if not question: return JsonResponse({'error': 'Question is empty'}, status=400)
+    if not question:
+        return JsonResponse({'error': 'Question is empty'}, status=400)
     answer = ask_question(question, vectorstore_path)
     return JsonResponse({'answer': answer})

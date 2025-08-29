@@ -65,6 +65,16 @@
     {% if error %}<div class="alert alert-danger mt-3">{{ error }}</div>{% endif %}
 </div>
 
+<!-- 認識失敗オーバーレイ -->
+<div id="not-recognized-overlay">
+    <div class="nr-box">
+        <div class="scanner">
+            <div class="scan-bar"></div>
+        </div>
+        <p>型番を認識できませんでした。<br>もう一度お試しください。</p>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // ★★★ ここからがローディング画面のJavaScript ★★★
@@ -134,6 +144,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById("not-recognized-overlay");
+    const recognitionFailed = {{ recognition_failed|yesno:"true,false" }};
+    if (recognitionFailed) {
+        overlay.style.display = "flex";
+        setTimeout(() => overlay.style.display = "none", 3000);
+    }
+});
+</script>
+    // オーバーレイを表示する関数
+    function showNotRecognizedOverlay(message) {
+        if (overlay) {
+            overlay.querySelector("p").innerHTML = message || "型番を認識できませんでした。<br>もう一度お試しください。";
+            overlay.style.display = "flex";
+            setTimeout(() => overlay.style.display = "none", 3000);
+        }
+    }
+
+    // ★ recognition_failed が True なら自動表示 ★
+    {% if recognition_failed %}
+        showNotRecognizedOverlay();
+    {% endif %}
+
+    // 既存のローディング画面やフォーム送信処理もここに
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const forms = document.querySelectorAll('.needs-validation');
+    forms.forEach(form => {
+        form.addEventListener('submit', () => { loadingOverlay.style.display = 'flex'; });
+    });
+
+});
+
+
 </script>
 
 <style>
